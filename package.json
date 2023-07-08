@@ -74,7 +74,7 @@
     "@types/buffer-crc32": "^0.2.2",
     "@types/chai": "~4.3.5",
     "@types/mocha": "~10.0.1",
-    "@types/node": "^20.3.0",
+    "@types/node": "^20.4.1",
     "@types/sinon": "~10.0.15",
     "@types/streamsaver": "^2.0.1",
     "@types/uuid": "~9.0.2",
