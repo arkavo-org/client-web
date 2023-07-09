@@ -32,6 +32,8 @@ const clearText = await client.decrypt(cipherText);
 
 ## Test
 
+Vite
+
 ```shell
 npm install -g create-vite
 create-vite test-app --template react-ts
@@ -39,4 +41,14 @@ cd test-app
 npm link @arkavo-org/client
 cp ../tests/integration-vite-react-ts-App.tsx src/App.tsx
 npm run dev
+```
+
+Create React App
+
+```shell
+npx create-react-app test-app --template typescript
+cd test-app
+npm link @arkavo-org/client
+cp ../tests/integration-cra-ts-App.tsx src/App.tsx
+npm run start
 ```
