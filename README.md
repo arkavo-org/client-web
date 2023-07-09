@@ -27,3 +27,16 @@ const plainText = "hello world"
 const cipherText = await client.encrypt(plainText);
 const clearText = await client.decrypt(cipherText);
 ```
+
+## Development
+
+## Test
+
+```shell
+npm install -g create-vite
+create-vite test-app --template react-ts
+cd test-app
+npm link @arkavo-org/client
+cp ../tests/integration-vite-react-ts-App.tsx src/App.tsx
+npm run dev
+```
