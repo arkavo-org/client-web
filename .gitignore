@@ -1,3 +1,8 @@
+# .js
+*.js.map
+src/**/*.js
+tdf3/**/*.js
+
 # Logs
 logs
 *.log
