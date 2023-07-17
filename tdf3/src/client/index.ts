@@ -367,7 +367,7 @@ export class Client {
 
     // Await in order to catch any errors from this call.
     // TODO: Write error event to stream and don't await.
-    return tdf.readStream(
+    return await tdf.readStream(
       chunker,
       rcaSource,
       this.clientConfig.progressHandler,

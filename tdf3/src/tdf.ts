@@ -30,9 +30,6 @@ import {
   PolicyIntegrityError,
   TdfDecryptError,
 } from './errors.js';
-
-// configurable
-// TODO: remove dependencies from ciphers so that we can open-source instead of relying on other Virtru libs
 import { AesGcmCipher } from './ciphers/index.js';
 import {
   AppIdAuthProvider,
@@ -44,6 +41,7 @@ import {
 import PolicyObject from '../../src/tdf/PolicyObject.js';
 import { DecryptResult } from './crypto/declarations.js';
 import { CentralDirectory } from './utils/zip-reader.js';
+import { unsigned } from './utils/buffer-crc32.js';
 
 // TODO: input validation on manifest JSON
 const DEFAULT_SEGMENT_SIZE = 1024 * 1024;
@@ -698,8 +696,7 @@ export class TDF extends EventEmitter {
       if (totalByteCount > byteLimit) {
         throw new Error(`Safe byte limit (${byteLimit}) exceeded`);
       }
-      // FIXME buffer-crc32
-      // crcCounter = crc32.unsigned(chunk, crcCounter);
+      crcCounter = unsigned(chunk as Uint8Array, crcCounter);
       fileByteCount += chunk.length;
     }
 
