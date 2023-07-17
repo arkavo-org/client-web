@@ -1,5 +1,5 @@
 import { AttributeValidationError, IllegalArgumentError } from '../errors.js';
-import { AttributeObject } from '../models/attribute-set.js';
+import { AttributeObject } from '../models/index.js';
 
 const sageGetMatch = (match: RegExpMatchArray | null) => (match ? match[0] : null);
 

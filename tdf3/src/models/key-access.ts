@@ -25,7 +25,7 @@ export class Wrapped {
     encryptedMetadataStr: string
   ): Promise<KeyAccessObject> {
     const policyStr = JSON.stringify(policy);
-    const unwrappedKeyBinary = Binary.fromBuffer(Buffer.from(keyBuffer));
+    const unwrappedKeyBinary = Binary.fromArrayBuffer(keyBuffer.buffer);
     const wrappedKeyBinary = await cryptoService.encryptWithPublicKey(
       unwrappedKeyBinary,
       this.publicKey
@@ -53,7 +53,6 @@ export class Remote {
   readonly type = 'remote';
   keyAccessObject?: KeyAccessObject;
   wrappedKey?: string;
-  policyBinding?: string;
 
   constructor(
     public readonly url: string,
@@ -71,7 +70,7 @@ export class Remote {
       hex.encodeArrayBuffer(keyBuffer),
       base64.encode(policyStr)
     );
-    const unwrappedKeyBinary = Binary.fromBuffer(Buffer.from(keyBuffer));
+    const unwrappedKeyBinary = Binary.fromArrayBuffer(keyBuffer.buffer);
     const wrappedKeyBinary = await cryptoService.encryptWithPublicKey(
       unwrappedKeyBinary,
       this.publicKey

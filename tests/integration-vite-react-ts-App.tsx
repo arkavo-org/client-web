@@ -3,6 +3,7 @@ import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 import { AuthProvider, AuthProviders } from "@arkavo-org/client";
+import { NanoTDFClient } from '../src';
 
 function App() {
   const authProvider: AuthProvider = new AuthProviders.OIDCExternalJwtProvider({clientId: "", externalJwt: "", oidcOrigin: ""})
@@ -21,7 +22,15 @@ function App() {
       </div>
       <h1>Vite + React</h1>
       <div className="card">
-        <button onClick={() => setCount(() => count + 1)}>
+        <button onClick={async () => {
+          const client = new Client(authProvider, "http://localhost:65432/api/kas");
+          let cipherText = await client.encrypt("hello world");
+          await client.decrypt(cipherText);
+          const nanoClient = new NanoTDFClient(authProvider, "http://localhost:65432/api/kas");
+          cipherText = await nanoClient.encrypt("hello world");
+          await nanoClient.decrypt(cipherText);
+          setCount(() => count + 1);
+        }}>
           count is {count}
         </button>
         <p>

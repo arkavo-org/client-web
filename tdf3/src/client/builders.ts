@@ -1,12 +1,9 @@
 import { GetObjectCommand, HeadObjectCommand, S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
 import axios from 'axios';
-
-import { arrayBufferToBuffer } from '../utils/index.js';
 import { AttributeValidator } from './validation.js';
 import { AttributeObject, Policy } from '../models/index.js';
 import { type Metadata, type RcaLink, type RcaParams } from '../tdf.js';
 import { Binary } from '../binary.js';
-
 import { IllegalArgumentError } from '../errors.js';
 import { PemKeyPair } from '../crypto/declarations.js';
 import { EntityObject } from '../../../src/tdf/index.js';
@@ -249,9 +246,9 @@ class EncryptParamsBuilder {
 
   /**
    * Specify the content to encrypt, in buffer form.
-   * @param {Buffer} buf - a buffer to encrypt.
+   * @param {ArrayBuffer} buf - a buffer to encrypt.
    */
-  setBufferSource(buf: Buffer) {
+  setBufferSource(buf: ArrayBuffer) {
     const stream = new ReadableStream({
       pull(controller) {
         controller.enqueue(buf);
@@ -263,10 +260,10 @@ class EncryptParamsBuilder {
 
   /**
    * Specify the content to encrypt, in buffer form. Returns this object for method chaining.
-   * @param {Buffer} buf - a buffer to encrypt
+   * @param {ArrayBuffer} buf - a buffer to encrypt
    * @return {EncryptParamsBuilder} - this object.
    */
-  withBufferSource(buf: Buffer) {
+  withBufferSource(buf: ArrayBuffer) {
     this.setBufferSource(buf);
     return this;
   }
@@ -281,7 +278,7 @@ class EncryptParamsBuilder {
    * @return {EncryptParamsBuilder} - this object
    */
   setArrayBufferSource(arraybuffer: ArrayBuffer) {
-    this.setBufferSource(arrayBufferToBuffer(arraybuffer));
+    this.setBufferSource(arraybuffer);
   }
 
   /**
@@ -652,16 +649,16 @@ class DecryptParamsBuilder {
    * Set the TDF ciphertext to decrypt, in buffer form.
    * @param {Buffer} buffer - a buffer to decrypt.
    */
-  setBufferSource(buffer: Buffer) {
+  setBufferSource(buffer: Uint8Array) {
     this._params.source = { type: 'buffer', location: buffer };
   }
 
   /**
    * Set the TDF ciphertext to decrypt, in buffer form. Returns this object for method chaining.
-   * @param {Buffer} buffer - a buffer to decrypt.
+   * @param {ArrayBuffer} buffer - a buffer to decrypt.
    * @return {DecryptParamsBuilder} - this object.
    */
-  withBufferSource(buffer: Buffer): DecryptParamsBuilder {
+  withBufferSource(buffer: Uint8Array): DecryptParamsBuilder {
     this.setBufferSource(buffer);
     return this;
   }
@@ -773,20 +770,20 @@ class DecryptParamsBuilder {
    * <br/><br/>
    * Example: https://developer.mozilla.org/en-US/docs/Web/API/FileReader/onload
    *
-   * @param {ArrayBuffer} arraybuffer - the array buffer containing the file to decrypt.
+   * @param {Uint8Array} arraybuffer - the array buffer containing the file to decrypt.
    * @return {DecryptParamsBuilder} - this object
    */
-  setArrayBufferSource(arraybuffer: ArrayBuffer) {
-    this.setBufferSource(arrayBufferToBuffer(arraybuffer));
+  setArrayBufferSource(arraybuffer: Uint8Array) {
+    this.setBufferSource(arraybuffer);
   }
 
   /**
    * Specify the content to decrypt using an ArrayBuffer reference. Returns this object for method chaining.
    *
-   * @param  {ArrayBuffer} arraybuffer - the ArrayBuffer used to load file content from a browser
+   * @param  {Uint8Array} arraybuffer - the ArrayBuffer used to load file content from a browser
    * @return {DecryptParamsBuilder} - this object.
    */
-  withArrayBufferSource(arraybuffer: ArrayBuffer): DecryptParamsBuilder {
+  withArrayBufferSource(arraybuffer: Uint8Array): DecryptParamsBuilder {
     this.setArrayBufferSource(arraybuffer);
     return this;
   }

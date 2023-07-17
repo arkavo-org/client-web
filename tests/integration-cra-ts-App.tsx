@@ -14,9 +14,8 @@ function App() {
         <img src={logo} className="App-logo" alt="logo" />
         <button onClick={async () => {
           const client = new NanoTDFClient(authProvider, "http://localhost:65432/api/kas");
-          await client.encrypt("hello world");
-          // FIXME CORS error with quickstart
-          // await client.decrypt(cipherText);
+          const cipherText = await client.encrypt("hello world");
+          await client.decrypt(cipherText);
           setCount(() => count + 1);
         }}>
           count is {count}

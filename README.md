@@ -30,6 +30,32 @@ const clearText = await client.decrypt(cipherText);
 
 ## Development
 
+### OIDC
+
+https://www.npmjs.com/package/keycloak-js?activeTab=readme
+
+user1 / testuser123 
+
+### Proxy around CORS
+
+```shell
+traefik --configFile=traefik.yaml
+```
+
+### Create React App
+
+```shell
+npm link
+npx create-react-app test-app --template typescript
+cd test-app
+npm link @arkavo-org/client
+npm install keycloak-js
+cp ../tests/developmeny-cra-ts-App.tsx src/App.tsx
+npm run start
+```
+
+
+
 ## Test
 
 Vite
