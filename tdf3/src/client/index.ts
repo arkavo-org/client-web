@@ -1,18 +1,10 @@
 import { v4 } from 'uuid';
-import {
-  type Chunker,
-  fromBuffer,
-  fromDataSource,
-  isAppIdProviderCheck,
-  streamToBuffer,
-} from '../utils/index.js';
-import { base64 } from '../../../src/encodings/index.js';
+import { fromBuffer, fromDataSource } from '../utils/index.js';
 import { TDF } from '../tdf.js';
 import { OIDCRefreshTokenProvider } from '../../../src/auth/oidc-refreshtoken-provider.js';
 import { OIDCExternalJwtProvider } from '../../../src/auth/oidc-externaljwt-provider.js';
 import { PemKeyPair } from '../crypto/declarations.js';
 import { AppIdAuthProvider, AuthProvider, HttpRequest } from '../../../src/auth/auth.js';
-import EAS from '../../../src/auth/Eas.js';
 import {
   DecryptParams,
   DecryptParamsBuilder,
@@ -37,17 +29,13 @@ const makeChunkable = async (source: DecryptSource) => {
   if (!source) {
     throw new Error('Invalid source');
   }
-  // we don't support streams anyway (see zipreader.js)
-  let initialChunker: Chunker;
-  let buf = null;
   if (source.type === 'stream') {
-    buf = await streamToBuffer(source.location);
-    initialChunker = fromBuffer(buf);
+    // FIXME here
+    // return fromBuffer(await streamToBuffer(source.location));
+    return fromBuffer(new Uint8Array());
   } else {
-    initialChunker = await fromDataSource(source);
+    return await fromDataSource(source);
   }
-  // Pull first two bytes from source.
-  return initialChunker;
 };
 
 export interface ClientConfig {
@@ -81,7 +69,6 @@ export interface ClientConfig {
  * Additionally, update the auth injector with the (potentially new) pubkey
  */
 export async function createSessionKeys({
-  authProvider,
   dpopEnabled,
   keypair,
 }: {
@@ -97,14 +84,6 @@ export async function createSessionKeys({
     signingKeys = await crypto.subtle.generateKey(rsaPkcs1Sha256(), true, ['sign']);
   }
 
-  // This will contact the auth server and forcibly refresh the auth token claims,
-  // binding the token and the (new) pubkey together.
-  // Note that we base64 encode the PEM string here as a quick workaround, simply because
-  // a formatted raw PEM string isn't a valid header value and sending it raw makes keycloak's
-  // header parser barf. There are more subtle ways to solve this, but this works for now.
-  if (authProvider && !isAppIdProviderCheck(authProvider)) {
-    await authProvider?.updateClientPublicKey(base64.encode(k2.publicKey), signingKeys);
-  }
   return { keypair: k2, signingKeys };
 }
 
@@ -146,8 +125,6 @@ export class Client {
    */
   readonly sessionKeys: Promise<SessionKeys>;
 
-  readonly eas?: EAS;
-
   readonly dpopEnabled: boolean;
 
   readonly clientConfig: ClientConfig;
@@ -181,15 +158,6 @@ export class Client {
 
     this.authProvider = config.authProvider;
     this.clientConfig = clientConfig;
-
-    if (this.authProvider && isAppIdProviderCheck(this.authProvider)) {
-      this.eas = new EAS({
-        authProvider: this.authProvider,
-        endpoint:
-          clientConfig.entityObjectEndpoint || `${clientConfig.easEndpoint}/api/entityobject`,
-      });
-    }
-
     this.clientId = clientConfig.clientId;
     if (!this.authProvider) {
       if (!clientConfig.clientId) {
@@ -350,19 +318,10 @@ export class Client {
    */
   async decrypt({ source, rcaSource }: DecryptParams): Promise<DecoratedReadableStream> {
     const sessionKeys = await this.sessionKeys;
-    let entityObject;
-    if (this.eas) {
-      entityObject = await this.eas.fetchEntityObject({
-        publicKey: sessionKeys.keypair.publicKey,
-      });
-    }
     const tdf = TDF.create()
       .setPrivateKey(sessionKeys.keypair.privateKey)
       .setPublicKey(sessionKeys.keypair.publicKey)
       .setAuthProvider(this.authProvider);
-    if (entityObject) {
-      tdf.setEntity(entityObject);
-    }
     const chunker = await makeChunkable(source);
 
     // Await in order to catch any errors from this call.

@@ -2,6 +2,7 @@ import axios, { AxiosResponse } from 'axios';
 import {
   type DecoratedReadableStream,
   isDecoratedReadableStream,
+  streamToBuffer,
 } from '../client/DecoratedReadableStream.js';
 
 const axiosRemoteChunk = axios.create();
@@ -66,33 +67,32 @@ export type DataSource =
   | { type: 'stream'; location: DecoratedReadableStream };
 
 export const fromDataSource = async ({ type, location }: DataSource) => {
-  switch (type) {
-    case 'buffer':
-      if (!(location instanceof Uint8Array)) {
-        throw new Error('Invalid data source; must be uint8 array');
-      }
-      return fromBuffer(location);
-    case 'chunker':
-      if (!(location instanceof Function)) {
-        throw new Error('Invalid data source; must be uint8 array');
-      }
-      return location;
-    case 'file-browser':
-      if (!(location instanceof Blob)) {
-        throw new Error('Invalid data source; must be at least a Blob');
-      }
-      return fromBrowserFile(location);
-    case 'remote':
-      if (typeof location !== 'string') {
-        throw new Error('Invalid data source; url not provided');
-      }
-      return fromUrl(location);
-    case 'stream':
-      if (!isDecoratedReadableStream(location)) {
-        throw new Error('Invalid data source; must be DecoratedTdfStream');
-      }
-      return fromBuffer(await location.toBuffer());
-    default:
-      throw new Error(`Data source type not defined, or not supported: ${type}}`);
+  if (type === 'buffer') {
+    if (!(location instanceof Uint8Array)) {
+      throw new Error('Invalid data source; must be uint8 array');
+    }
+    return fromBuffer(location);
+  } else if (type === 'chunker') {
+    if (!(location instanceof Function)) {
+      throw new Error('Invalid data source; must be uint8 array');
+    }
+    return location;
+  } else if (type === 'file-browser') {
+    if (!(location instanceof Blob)) {
+      throw new Error('Invalid data source; must be at least a Blob');
+    }
+    return fromBrowserFile(location);
+  } else if (type === 'remote') {
+    if (typeof location !== 'string') {
+      throw new Error('Invalid data source; url not provided');
+    }
+    return fromUrl(location);
+  } else if (type === 'stream') {
+    if (!isDecoratedReadableStream(location)) {
+      throw new Error('Invalid data source; must be DecoratedTdfStream');
+    }
+    return fromBuffer(await streamToBuffer(location.stream));
+  } else {
+    throw new Error(`Data source type not defined, or not supported: ${type}}`);
   }
 };

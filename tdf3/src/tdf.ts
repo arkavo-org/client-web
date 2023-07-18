@@ -1,4 +1,3 @@
-import { EventEmitter } from 'events';
 import axios from 'axios';
 import { v4 } from 'uuid';
 import { exportSPKI, importPKCS8, importX509 } from 'jose';
@@ -97,7 +96,7 @@ type Chunk = {
   _resolve?: (value: unknown) => void;
 };
 
-export class TDF extends EventEmitter {
+export class TDF {
   policy?: Policy;
   mimeType?: string;
   contentStream?: ReadableStream<Uint8Array>;
@@ -114,8 +113,6 @@ export class TDF extends EventEmitter {
   chunkMap: Map<string, Chunk>;
 
   constructor() {
-    super();
-
     this.attributeSet = new AttributeSet();
     this.publicKey = '';
     this.privateKey = '';
@@ -803,7 +800,6 @@ export class TDF extends EventEmitter {
             key,
             this.privateKey
           );
-          this.emit('rewrap', metadata);
           return decryptedKeyBinary.asArrayBuffer();
         } catch (e) {
           throw new KasDecryptError(
@@ -912,9 +908,9 @@ export class TDF extends EventEmitter {
    * readStream
    *
    * @param {Object} chunker - A function object for getting data in a series of typed array objects
-   * @param {Object} rcaParams - Optional field to specify if file is stored on S3
-   * @param progressHandler
-   * @param fileStreamServiceWorker
+   * @param {Object} rcaParams? - Optional field to specify if file is stored on S3
+   * @param progressHandler?
+   * @param fileStreamServiceWorker?
    */
   async readStream(
     chunker: Chunker,
@@ -1048,15 +1044,9 @@ export class TDF extends EventEmitter {
     }
 
     outputStream.manifest = this.manifest;
-    if (outputStream.emit) {
-      outputStream.emit('manifest', this.manifest);
-    }
     outputStream.metadata = metadata;
 
     // If the output stream can emit events, then emit the rewrap response.
-    if (outputStream.emit) {
-      outputStream.emit('rewrap', metadata);
-    }
     return outputStream;
   }
 }
