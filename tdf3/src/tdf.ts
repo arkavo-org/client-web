@@ -1,10 +1,8 @@
-import { EventEmitter } from 'events';
 import axios from 'axios';
 import { v4 } from 'uuid';
 import { exportSPKI, importPKCS8, importX509 } from 'jose';
 import { DecoratedReadableStream } from './client/DecoratedReadableStream.js';
 import { EntityObject } from '../../src/tdf/index.js';
-
 import {
   AttributeSet,
   isRemote as isRemoteKeyAccess,
@@ -17,17 +15,9 @@ import {
   UpsertResponse,
   Wrapped as KeyAccessWrapped,
 } from './models/index.js';
-import { base64 } from '../../src/encodings/index.js';
+import { base64, hex } from '../../src/encodings/index.js';
 import * as cryptoService from './crypto/index.js';
-import {
-  base64ToBuffer,
-  Chunker,
-  fromUrl,
-  isAppIdProviderCheck,
-  keyMerge,
-  ZipReader,
-  ZipWriter,
-} from './utils/index.js';
+import { Chunker, isAppIdProviderCheck, keyMerge, ZipReader, ZipWriter } from './utils/index.js';
 import { Binary } from './binary.js';
 import {
   IllegalArgumentError,
@@ -38,12 +28,7 @@ import {
   ManifestIntegrityError,
   PolicyIntegrityError,
   TdfDecryptError,
-  TdfPayloadExtractionError,
 } from './errors.js';
-import { htmlWrapperTemplate } from './templates/index.js';
-
-// configurable
-// TODO: remove dependencies from ciphers so that we can open-source instead of relying on other Virtru libs
 import { AesGcmCipher } from './ciphers/index.js';
 import {
   AppIdAuthProvider,
@@ -55,6 +40,7 @@ import {
 import PolicyObject from '../../src/tdf/PolicyObject.js';
 import { DecryptResult } from './crypto/declarations.js';
 import { CentralDirectory } from './utils/zip-reader.js';
+import { unsigned } from './utils/buffer-crc32.js';
 
 // TODO: input validation on manifest JSON
 const DEFAULT_SEGMENT_SIZE = 1024 * 1024;
@@ -110,14 +96,13 @@ type Chunk = {
   _resolve?: (value: unknown) => void;
 };
 
-export class TDF extends EventEmitter {
+export class TDF {
   policy?: Policy;
   mimeType?: string;
   contentStream?: ReadableStream<Uint8Array>;
   manifest?: Manifest;
   entity?: EntityObject;
   encryptionInformation?: SplitKey;
-  htmlTransferUrl?: string;
   authProvider?: AuthProvider | AppIdAuthProvider;
   integrityAlgorithm: string;
   segmentIntegrityAlgorithm: string;
@@ -128,8 +113,6 @@ export class TDF extends EventEmitter {
   chunkMap: Map<string, Chunk>;
 
   constructor() {
-    super();
-
     this.attributeSet = new AttributeSet();
     this.publicKey = '';
     this.privateKey = '';
@@ -153,48 +136,6 @@ export class TDF extends EventEmitter {
 
   static async generatePolicyUuid() {
     return v4();
-  }
-
-  /**
-   *
-   * @param {Buffer} payload - This is the payload. It must be a buffer.
-   * @param {json} manifest - This is the manifest
-   * @param {String} transferUrl
-   * @return {Buffer}
-   */
-  static wrapHtml(payload: Buffer, manifest: Manifest | string, transferUrl: string): Buffer {
-    const { origin } = new URL(transferUrl);
-    const exportManifest: string =
-      typeof manifest === 'string' ? manifest : JSON.stringify(manifest);
-
-    const fullHtmlString = htmlWrapperTemplate({
-      transferUrl,
-      transferBaseUrl: origin,
-      manifest: base64.encode(exportManifest),
-      payload: payload.toString('base64'),
-    });
-
-    return Buffer.from(fullHtmlString);
-  }
-
-  static unwrapHtml(htmlPayload: ArrayBuffer | Uint8Array | Binary | string) {
-    let html;
-    if (htmlPayload instanceof ArrayBuffer || ArrayBuffer.isView(htmlPayload)) {
-      html = new TextDecoder().decode(htmlPayload);
-    } else {
-      html = htmlPayload.toString();
-    }
-    const payloadRe = /<input id=['"]?data-input['"]?[^>]*value=['"]?([a-zA-Z0-9+/=]+)['"]?/;
-    const reResult = payloadRe.exec(html);
-    if (reResult === null) {
-      throw new TdfPayloadExtractionError('Payload is missing');
-    }
-    const base64Payload = reResult[1];
-    try {
-      return base64ToBuffer(base64Payload);
-    } catch (e) {
-      throw new TdfPayloadExtractionError('There was a problem extracting the TDF3 payload');
-    }
   }
 
   // return a PEM-encoded string from the provided KAS server
@@ -229,28 +170,8 @@ export class TDF extends EventEmitter {
     return pem;
   }
 
-  // Extracts the TDF's manifest
-  static async getManifestFromRemoteTDF(url: string): Promise<Manifest> {
-    const zipReader = new ZipReader(await fromUrl(url));
-
-    const centralDirectory = await zipReader.getCentralDirectory();
-    return await zipReader.getManifest(centralDirectory, '0.manifest.json');
-  }
-
-  // Extracts the TDF's manifest and thus the policy from a remote TDF
-  // DEPRECATED
-  static async getPolicyFromRemoteTDF(url: string): Promise<string> {
-    const manifest = await this.getManifestFromRemoteTDF(url);
-    return base64.decode(manifest.encryptionInformation.policy);
-  }
-
   setProtocol(): TDF {
     console.error('protocol is ignored; use client.encrypt instead');
-    return this;
-  }
-
-  setHtmlTransferUrl(url: string): TDF {
-    this.htmlTransferUrl = url;
     return this;
   }
 
@@ -456,12 +377,12 @@ export class TDF extends EventEmitter {
     switch (algorithmType.toLowerCase()) {
       case 'gmac':
         // use the auth tag baked into the encrypted payload
-        return payloadBinary.asBuffer().slice(-16).toString('hex');
+        return hex.encodeArrayBuffer(payloadBinary.asArrayBuffer().slice(-16));
       case 'hs256':
         // simple hmac is the default
         return await cryptoService.hmac(
-          unwrappedKeyBinary.asBuffer().toString('hex'),
-          payloadBinary.asBuffer().toString()
+          hex.encodeArrayBuffer(unwrappedKeyBinary.asArrayBuffer()),
+          new TextDecoder().decode(payloadBinary.asArrayBuffer())
         );
       default:
         throw new IllegalArgumentError(`Unsupported signature alg [${algorithmType}]`);
@@ -580,7 +501,7 @@ export class TDF extends EventEmitter {
       },
     ];
 
-    let currentBuffer = Buffer.alloc(0);
+    let currentBuffer = new Uint8Array(0);
 
     let totalByteCount = 0;
     let bytesProcessed = 0;
@@ -618,11 +539,11 @@ export class TDF extends EventEmitter {
     // determine default segment size by writing empty buffer
     const { segmentSizeDefault } = this;
     const encryptedBlargh = await this.encryptionInformation.encrypt(
-      Binary.fromBuffer(Buffer.alloc(segmentSizeDefault)),
+      Binary.fromArrayBuffer(new ArrayBuffer(segmentSizeDefault)),
       keyInfo.unwrappedKeyBinary
     );
-    const payloadBuffer = encryptedBlargh.payload.asBuffer();
-    const encryptedSegmentSizeDefault = payloadBuffer.length;
+    const payloadBuffer = encryptedBlargh.payload.asArrayBuffer();
+    const encryptedSegmentSizeDefault = payloadBuffer.byteLength;
 
     // start writing the content
     entryInfos[0].filename = '0.payload';
@@ -673,7 +594,7 @@ export class TDF extends EventEmitter {
         if (isFinalChunkLeft) {
           const encryptedSegment = await _encryptAndCountSegment(currentBuffer);
           controller.enqueue(encryptedSegment);
-          currentBuffer = Buffer.alloc(0);
+          currentBuffer = new Uint8Array(0);
         }
 
         if (isDone && currentBuffer.length === 0) {
@@ -756,7 +677,7 @@ export class TDF extends EventEmitter {
     if (upsertResponse) {
       plaintextStream.upsertResponse = upsertResponse;
       plaintextStream.tdfSize = totalByteCount;
-      plaintextStream.KEK = payloadKey ? null : kek.payload.asBuffer().toString('base64');
+      plaintextStream.KEK = payloadKey ? null : btoa(kek.payload.asString());
       plaintextStream.algorithm = manifest.encryptionInformation.method.algorithm;
     }
 
@@ -767,27 +688,26 @@ export class TDF extends EventEmitter {
       return zipWriter.getLocalFileHeader(filename, 0, 0, 0);
     }
 
-    function _countChunk(chunk: string | Buffer) {
+    function _countChunk(chunk: string | Uint8Array) {
       totalByteCount += chunk.length;
       if (totalByteCount > byteLimit) {
         throw new Error(`Safe byte limit (${byteLimit}) exceeded`);
       }
-      // FIXME buffer-crc32
-      // crcCounter = crc32.unsigned(chunk, crcCounter);
+      crcCounter = unsigned(chunk as Uint8Array, crcCounter);
       fileByteCount += chunk.length;
     }
 
-    async function _encryptAndCountSegment(chunk: Buffer) {
+    async function _encryptAndCountSegment(chunk: Uint8Array) {
       bytesProcessed += chunk.length;
       if (progressHandler) {
         progressHandler(bytesProcessed);
       }
       // Don't pass in an IV here. The encrypt function will generate one for you, ensuring that each segment has a unique IV.
       const encryptedResult = await encryptionInformation.encrypt(
-        Binary.fromBuffer(chunk),
+        Binary.fromArrayBuffer(chunk.buffer),
         payloadKey || keyInfo.unwrappedKeyBinary
       );
-      const payloadBuffer = encryptedResult.payload.asBuffer();
+      const payloadBuffer = encryptedResult.payload.asArrayBuffer();
       const payloadSigStr = await self.getSignature(
         payloadKey || keyInfo.unwrappedKeyBinary,
         encryptedResult.payload,
@@ -801,10 +721,12 @@ export class TDF extends EventEmitter {
         hash: base64.encode(payloadSigStr),
         segmentSize: chunk.length === segmentSizeDefault ? undefined : chunk.length,
         encryptedSegmentSize:
-          payloadBuffer.length === encryptedSegmentSizeDefault ? undefined : payloadBuffer.length,
+          payloadBuffer.byteLength === encryptedSegmentSizeDefault
+            ? undefined
+            : payloadBuffer.byteLength,
       });
-      const result = encryptedResult.payload.asBuffer();
-      _countChunk(result);
+      const result = encryptedResult.payload.asArrayBuffer();
+      _countChunk(new Uint8Array(result));
 
       return result;
     }
@@ -878,8 +800,7 @@ export class TDF extends EventEmitter {
             key,
             this.privateKey
           );
-          this.emit('rewrap', metadata);
-          return decryptedKeyBinary.asBuffer();
+          return decryptedKeyBinary.asArrayBuffer();
         } catch (e) {
           throw new KasDecryptError(
             `Unable to decrypt the response from KAS: [${e}: ${e}], response: [${e}]`
@@ -889,7 +810,7 @@ export class TDF extends EventEmitter {
     );
 
     // Merge the unwrapped keys from each KAS
-    const reconstructedKey = keyMerge(rewrappedKeys);
+    const reconstructedKey = keyMerge(rewrappedKeys.map((arrBuffer) => new Uint8Array(arrBuffer)));
     const reconstructedKeyBinary = Binary.fromArrayBuffer(reconstructedKey);
 
     return {
@@ -912,7 +833,7 @@ export class TDF extends EventEmitter {
 
     const segmentHashStr = await this.getSignature(
       reconstructedKeyBinary,
-      Binary.fromBuffer(encryptedChunk),
+      Binary.fromArrayBuffer(encryptedChunk),
       segmentIntegrityAlgorithmType || integrityAlgorithmType
     );
     if (hash !== base64.encode(segmentHashStr)) {
@@ -987,9 +908,9 @@ export class TDF extends EventEmitter {
    * readStream
    *
    * @param {Object} chunker - A function object for getting data in a series of typed array objects
-   * @param {Object} rcaParams - Optional field to specify if file is stored on S3
-   * @param progressHandler
-   * @param fileStreamServiceWorker
+   * @param {Object} rcaParams? - Optional field to specify if file is stored on S3
+   * @param progressHandler?
+   * @param fileStreamServiceWorker?
    */
   async readStream(
     chunker: Chunker,
@@ -1014,9 +935,8 @@ export class TDF extends EventEmitter {
     if (rcaParams && rcaParams.wk) {
       const { wk, al } = rcaParams;
       this.encryptionInformation = new SplitKey(TDF.createCipher(al.toLowerCase()));
-      const kekPayload = Binary.fromBuffer(Buffer.from(wk, 'base64'));
       const decodedReconstructedKeyBinary = await this.encryptionInformation.decrypt(
-        kekPayload.asBuffer(),
+        Uint8Array.from(atob(wk).split(''), (char) => char.charCodeAt(0)),
         reconstructedKeyBinary
       );
       reconstructedKeyBinary = decodedReconstructedKeyBinary.payload;
@@ -1124,15 +1044,9 @@ export class TDF extends EventEmitter {
     }
 
     outputStream.manifest = this.manifest;
-    if (outputStream.emit) {
-      outputStream.emit('manifest', this.manifest);
-    }
     outputStream.metadata = metadata;
 
     // If the output stream can emit events, then emit the rewrap response.
-    if (outputStream.emit) {
-      outputStream.emit('rewrap', metadata);
-    }
     return outputStream;
   }
 }

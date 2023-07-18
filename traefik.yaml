@@ -1,0 +1,47 @@
+## STATIC CONFIGURATION
+log:
+  level: DEBUG
+
+api:
+  insecure: true
+  dashboard: true
+
+entryPoints:
+  web:
+    address: ":80"
+
+providers:
+  file:
+    filename: "traefik.yaml"
+
+## DYNAMIC CONFIGURATION
+http:
+  routers:
+    route-to-local-ip:
+      rule: "Host(`localhost`)"
+      service: route-to-local-ip-service
+      entryPoints: ["web"]
+
+    route-to-auth:
+      rule: "Host(`localhost`) && PathPrefix(`/auth`)"
+      service: auth-service
+      entryPoints: ["web"]
+
+    route-to-kas:
+      rule: "Host(`localhost`) && PathPrefix(`/api/kas`)"
+      service: kas-service
+      entryPoints: ["web"]
+
+  services:
+    route-to-local-ip-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:3000"
+    auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:65432"
+    kas-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:65432/api/kas"

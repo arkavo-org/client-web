@@ -27,3 +27,54 @@ const plainText = "hello world"
 const cipherText = await client.encrypt(plainText);
 const clearText = await client.decrypt(cipherText);
 ```
+
+## Development
+
+### OIDC
+
+https://www.npmjs.com/package/keycloak-js?activeTab=readme
+
+user1 / testuser123 
+
+### Proxy around CORS
+
+```shell
+traefik --configFile=traefik.yaml
+```
+
+### Create React App
+
+```shell
+npm link
+npx create-react-app test-app --template typescript
+cd test-app
+npm link @arkavo-org/client
+npm install keycloak-js
+cp ../tests/developmeny-cra-ts-App.tsx src/App.tsx
+npm run start
+```
+
+
+
+## Test
+
+Vite
+
+```shell
+npm install -g create-vite
+create-vite test-app --template react-ts
+cd test-app
+npm link @arkavo-org/client
+cp ../tests/integration-vite-react-ts-App.tsx src/App.tsx
+npm run dev
+```
+
+Create React App
+
+```shell
+npx create-react-app test-app --template typescript
+cd test-app
+npm link @arkavo-org/client
+cp ../tests/integration-cra-ts-App.tsx src/App.tsx
+npm run start
+```

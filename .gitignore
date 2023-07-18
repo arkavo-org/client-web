@@ -1,3 +1,8 @@
+# .js
+*.js.map
+src/**/*.js
+tdf3/**/*.js
+
 # Logs
 logs
 *.log
@@ -109,3 +114,10 @@ typings/
 # temporary folders
 **/temp/
 /act.env
+/test-app/
+
+# playwright
+tests/playwright/node_modules/
+tests/playwright/test-results/
+tests/playwright/playwright-report/
+tests/playwright/playwright/.cache/

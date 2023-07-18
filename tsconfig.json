@@ -106,5 +106,5 @@
     // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
     "skipLibCheck": false                                 /* Skip type checking all .d.ts files. */
   },
-  "exclude": ["tests","**/node_modules"]
+  "exclude": ["tests","test-app","**/node_modules"]
 }
