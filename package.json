@@ -54,7 +54,7 @@
   "dependencies": {
     "@aws-sdk/abort-controller": "^3.357.0",
     "@aws-sdk/client-s3": "^3.374.0",
-    "@aws-sdk/middleware-endpoint": "^3.365.0",
+    "@aws-sdk/middleware-endpoint": "^3.374.0",
     "@aws-sdk/protocol-http": "^3.357.0",
     "@aws-sdk/smithy-client": "^3.360.0",
     "ajv": "^6.12.6",
